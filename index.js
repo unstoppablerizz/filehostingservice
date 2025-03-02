@@ -2,102 +2,89 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const util = require('util');
-const readdir = util.promisify(fs.readdir);
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const port = 3000;
 
-// Set up the upload folder
-const uploadFolder = path.join(__dirname, 'uploads');
+// The passcode for the admin
+const ADMIN_PASSCODE_HASH = bcrypt.hashSync('your-strong-passcode', 10); // Replace with your desired passcode
 
-// Create the upload folder if it doesn't exist
-if (!fs.existsSync(uploadFolder)) {
-    fs.mkdirSync(uploadFolder);
+// Create an 'uploads' directory if it doesn't exist
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
 }
 
-// Get today's date in YYYY-MM-DD format
-const getDateFolder = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0'); // Month is 0-indexed
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
-
-// Multer storage configuration with date-based folder structure
+// Set up Multer for file storage
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const dateFolder = getDateFolder();
-        const dateFolderPath = path.join(uploadFolder, dateFolder);
-
-        // Create the date-based folder if it doesn't exist
-        if (!fs.existsSync(dateFolderPath)) {
-            fs.mkdirSync(dateFolderPath);
-        }
-
-        cb(null, dateFolderPath);
+        cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname)); // Filename with timestamp
+        cb(null, Date.now() + path.extname(file.originalname));
     }
 });
 
 const upload = multer({ storage: storage });
 
-// Serve static files from the "uploads" folder
-app.use('/uploads', express.static(uploadFolder));
+// Serve static files (like index.html) from the 'public' folder
+app.use(express.static('public'));
 
-// Home route to upload a file and list all uploaded files
-app.get('/', async (req, res) => {
-    try {
-        const directories = await readdir(uploadFolder); // Read directories (date-based)
-        let fileLinks = '';
-
-        // Iterate over each directory (created based on date)
-        for (const dir of directories) {
-            const dirPath = path.join(uploadFolder, dir);
-            if (fs.lstatSync(dirPath).isDirectory()) {
-                const files = await readdir(dirPath); // Read files in the date-based folder
-                for (const file of files) {
-                    const fileUrl = `/uploads/${dir}/${file}`;
-                    fileLinks += `<li><a href="${fileUrl}" target="_blank">${file}</a></li>`;
-                }
-            }
-        }
-
-        res.send(`
-            <h1>Upload a File</h1>
-            <form action="/upload" method="POST" enctype="multipart/form-data">
-                <input type="file" name="file" required />
-                <button type="submit">Upload</button>
-            </form>
-            <br>
-            <h2>Uploaded Files</h2>
-            <ul>
-                ${fileLinks}
-            </ul>
-        `);
-    } catch (err) {
-        res.send('Error listing files');
-    }
-});
+// Parse incoming form data (to handle the admin login form)
+app.use(express.urlencoded({ extended: true }));
 
 // Handle file upload
 app.post('/upload', upload.single('file'), (req, res) => {
     if (!req.file) {
-        return res.send('Please upload a file.');
+        return res.status(400).send('No file uploaded.');
     }
-
-    // Generate the file URL
-    const fileUrl = `/uploads/${getDateFolder()}/${req.file.filename}`;
     res.send(`
-        <h1>File Uploaded Successfully</h1>
-        <p>Click the link below to view your file:</p>
-        <a href="${fileUrl}" target="_blank">View File</a>
-        <br><br>
-        <a href="/">Upload Another File</a>
+        <h1>File Uploaded</h1>
+        <p>Your file has been uploaded successfully.</p>
+        <p><a href="/uploads/${req.file.filename}">Click here to download the file</a></p>
+        <br>
+        <a href="/">Upload another file</a>
     `);
+});
+
+// Serve the uploaded files
+app.use('/uploads', express.static(uploadDir));
+
+// Admin login page
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+// Handle admin login (passcode validation)
+app.post('/admin', (req, res) => {
+    const { passcode } = req.body;
+    
+    // Check if the passcode matches
+    bcrypt.compare(passcode, ADMIN_PASSCODE_HASH, (err, result) => {
+        if (err) {
+            return res.status(500).send('Internal server error.');
+        }
+
+        if (result) {
+            // If valid passcode, show the directory of uploaded files
+            const files = fs.readdirSync(uploadDir).map(file => ({
+                filename: file,
+                url: `/uploads/${file}`
+            }));
+            
+            res.send(`
+                <h1>Admin File Directory</h1>
+                <ul>
+                    ${files.map(file => `<li><a href="${file.url}">${file.filename}</a></li>`).join('')}
+                </ul>
+                <br>
+                <a href="/admin">Log out</a>
+            `);
+        } else {
+            res.status(401).send('Invalid passcode.');
+        }
+    });
 });
 
 // Start the server
