@@ -2,13 +2,12 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const bcrypt = require('bcryptjs');
 
 const app = express();
 const port = 3000;
 
-// The passcode for the admin
-const ADMIN_PASSCODE_HASH = bcrypt.hashSync('your-strong-passcode', 10); // Replace with your desired passcode
+// The passcode for the admin (plain text)
+const ADMIN_PASSCODE = 'your-strong-passcode'; // Replace with your desired passcode
 
 // Create an 'uploads' directory if it doesn't exist
 const uploadDir = path.join(__dirname, 'uploads');
@@ -61,30 +60,24 @@ app.post('/admin', (req, res) => {
     const { passcode } = req.body;
     
     // Check if the passcode matches
-    bcrypt.compare(passcode, ADMIN_PASSCODE_HASH, (err, result) => {
-        if (err) {
-            return res.status(500).send('Internal server error.');
-        }
-
-        if (result) {
-            // If valid passcode, show the directory of uploaded files
-            const files = fs.readdirSync(uploadDir).map(file => ({
-                filename: file,
-                url: `/uploads/${file}`
-            }));
-            
-            res.send(`
-                <h1>Admin File Directory</h1>
-                <ul>
-                    ${files.map(file => `<li><a href="${file.url}">${file.filename}</a></li>`).join('')}
-                </ul>
-                <br>
-                <a href="/admin">Log out</a>
-            `);
-        } else {
-            res.status(401).send('Invalid passcode.');
-        }
-    });
+    if (passcode === ADMIN_PASSCODE) {
+        // If valid passcode, show the directory of uploaded files
+        const files = fs.readdirSync(uploadDir).map(file => ({
+            filename: file,
+            url: `/uploads/${file}`
+        }));
+        
+        res.send(`
+            <h1>Admin File Directory</h1>
+            <ul>
+                ${files.map(file => `<li><a href="${file.url}">${file.filename}</a></li>`).join('')}
+            </ul>
+            <br>
+            <a href="/admin">Log out</a>
+        `);
+    } else {
+        res.status(401).send('Invalid passcode.');
+    }
 });
 
 // Start the server
