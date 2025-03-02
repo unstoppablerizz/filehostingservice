@@ -7,7 +7,7 @@ const app = express();
 const port = 3000;
 
 // The passcode for the admin (plain text)
-const ADMIN_PASSCODE = 'your-strong-passcode';  // Change this to your own passcode
+const ADMIN_PASSCODE = 'sigmagyat1';  // Change this to your own passcode
 
 // Create an 'uploads' directory if it doesn't exist
 const uploadDir = path.join(__dirname, 'uploads');
