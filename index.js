@@ -3,71 +3,78 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Create an Express app
 const app = express();
 const port = 3000;
 
-// Set up the file upload destination
-const uploadDir = './uploads';
+// Set up the upload folder
+const uploadFolder = path.join(__dirname, 'uploads');
 
-// Ensure the uploads directory exists
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
+// Create the upload folder if it doesn't exist
+if (!fs.existsSync(uploadFolder)) {
+    fs.mkdirSync(uploadFolder);
 }
 
-// Multer setup for file uploading
+// Get today's date as YYYY-MM-DD format
+const getDateFolder = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0'); // Month is 0-indexed
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+// Set up Multer storage configuration with dynamic directories
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Using timestamp to ensure unique filenames
-  }
+    destination: (req, file, cb) => {
+        const dateFolder = getDateFolder(); // Generate date-based folder
+        const dateFolderPath = path.join(uploadFolder, dateFolder);
+
+        // Create the date-based folder if it doesn't exist
+        if (!fs.existsSync(dateFolderPath)) {
+            fs.mkdirSync(dateFolderPath);
+        }
+
+        cb(null, dateFolderPath); // Set the destination folder to the date-based folder
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname)); // Set filename to current timestamp
+    }
 });
 
 const upload = multer({ storage: storage });
 
-// Serve static files like CSS, images, etc., from the "public" folder
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files (uploaded files) from the "uploads" folder
+app.use('/uploads', express.static(uploadFolder));
 
-// Serve files from the "uploads" directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Endpoint to upload files
-app.post('/upload', upload.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).send('No file uploaded.');
-  }
-  // Send the file URL back as the response
-  res.json({ fileUrl: `http://localhost:${port}/uploads/${req.file.filename}` });
+// Home route to upload a file
+app.get('/', (req, res) => {
+    res.send(`
+        <h1>Upload a File</h1>
+        <form action="/upload" method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" required />
+            <button type="submit">Upload</button>
+        </form>
+    `);
 });
 
-// Serve a simple HTML form to upload files (optional)
-app.get('/', (req, res) => {
-  res.send(`
-    <html>
-      <head>
-        <link rel="stylesheet" type="text/css" href="/styles.css">
-        <title>Upload File</title>
-      </head>
-      <body>
-        <h1>Upload File</h1>
-        <form ref='uploadForm' 
-          id='uploadForm' 
-          action='/upload' 
-          method='post' 
-          encType="multipart/form-data">
-            <input type="file" name="file" />
-            <input type='submit' value='Upload!' />
-        </form>
-        
-        <div class="file-url" id="fileUrl"></div>
-      </body>
-    </html>
-  `);
+// File upload route
+app.post('/upload', upload.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.send('Please upload a file.');
+    }
+
+    // Get the relative file path
+    const fileUrl = `/uploads/${getDateFolder()}/${req.file.filename}`;
+    res.send(`
+        <h1>File Uploaded Successfully</h1>
+        <p>Click the link below to view your file:</p>
+        <a href="${fileUrl}" target="_blank">View File</a>
+        <br><br>
+        <a href="/">Upload Another File</a>
+    `);
 });
 
 // Start the server
 app.listen(port, () => {
-  console.log(`File hosting service running at http://localhost:${port}`);
+    console.log(`File hosting server running at http://localhost:${port}`);
 });
