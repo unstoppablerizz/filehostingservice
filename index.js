@@ -48,41 +48,8 @@ const upload = multer({ storage: storage });
 // Serve static files from the "uploads" folder
 app.use('/uploads', express.static(uploadFolder));
 
-// Home route to upload a file
-app.get('/', (req, res) => {
-    res.send(`
-        <h1>Upload a File</h1>
-        <form action="/upload" method="POST" enctype="multipart/form-data">
-            <input type="file" name="file" required />
-            <button type="submit">Upload</button>
-        </form>
-        <br>
-        <h2>Uploaded Files</h2>
-        <ul>
-            <li><a href="/files">View All Uploaded Files</a></li>
-        </ul>
-    `);
-});
-
-// Handle file upload
-app.post('/upload', upload.single('file'), (req, res) => {
-    if (!req.file) {
-        return res.send('Please upload a file.');
-    }
-
-    // Generate the file URL
-    const fileUrl = `/uploads/${getDateFolder()}/${req.file.filename}`;
-    res.send(`
-        <h1>File Uploaded Successfully</h1>
-        <p>Click the link below to view your file:</p>
-        <a href="${fileUrl}" target="_blank">View File</a>
-        <br><br>
-        <a href="/">Upload Another File</a>
-    `);
-});
-
-// Route to list all uploaded files
-app.get('/files', async (req, res) => {
+// Home route to upload a file and list all uploaded files
+app.get('/', async (req, res) => {
     try {
         const directories = await readdir(uploadFolder); // Read directories (date-based)
         let fileLinks = '';
@@ -100,16 +67,37 @@ app.get('/files', async (req, res) => {
         }
 
         res.send(`
-            <h1>All Uploaded Files</h1>
+            <h1>Upload a File</h1>
+            <form action="/upload" method="POST" enctype="multipart/form-data">
+                <input type="file" name="file" required />
+                <button type="submit">Upload</button>
+            </form>
+            <br>
+            <h2>Uploaded Files</h2>
             <ul>
                 ${fileLinks}
             </ul>
-            <br><br>
-            <a href="/">Upload Another File</a>
         `);
     } catch (err) {
         res.send('Error listing files');
     }
+});
+
+// Handle file upload
+app.post('/upload', upload.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.send('Please upload a file.');
+    }
+
+    // Generate the file URL
+    const fileUrl = `/uploads/${getDateFolder()}/${req.file.filename}`;
+    res.send(`
+        <h1>File Uploaded Successfully</h1>
+        <p>Click the link below to view your file:</p>
+        <a href="${fileUrl}" target="_blank">View File</a>
+        <br><br>
+        <a href="/">Upload Another File</a>
+    `);
 });
 
 // Start the server
