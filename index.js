@@ -16,7 +16,7 @@ if (!fs.existsSync(uploadFolder)) {
     fs.mkdirSync(uploadFolder);
 }
 
-// Get today's date as YYYY-MM-DD format
+// Get today's date in YYYY-MM-DD format
 const getDateFolder = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -25,10 +25,10 @@ const getDateFolder = () => {
     return `${year}-${month}-${day}`;
 };
 
-// Set up Multer storage configuration with dynamic directories
+// Multer storage configuration with date-based folder structure
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const dateFolder = getDateFolder(); // Generate date-based folder
+        const dateFolder = getDateFolder();
         const dateFolderPath = path.join(uploadFolder, dateFolder);
 
         // Create the date-based folder if it doesn't exist
@@ -36,17 +36,83 @@ const storage = multer.diskStorage({
             fs.mkdirSync(dateFolderPath);
         }
 
-        cb(null, dateFolderPath); // Set the destination folder to the date-based folder
+        cb(null, dateFolderPath);
     },
     filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname)); // Set filename to current timestamp
+        cb(null, Date.now() + path.extname(file.originalname)); // Filename with timestamp
     }
 });
 
 const upload = multer({ storage: storage });
 
-// Serve static files (uploaded files) from the "uploads" folder
+// Serve static files from the "uploads" folder
 app.use('/uploads', express.static(uploadFolder));
 
 // Home route to upload a file
-app.get('/', (req, res
+app.get('/', (req, res) => {
+    res.send(`
+        <h1>Upload a File</h1>
+        <form action="/upload" method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" required />
+            <button type="submit">Upload</button>
+        </form>
+        <br>
+        <h2>Uploaded Files</h2>
+        <ul>
+            <li><a href="/files">View All Uploaded Files</a></li>
+        </ul>
+    `);
+});
+
+// Handle file upload
+app.post('/upload', upload.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.send('Please upload a file.');
+    }
+
+    // Generate the file URL
+    const fileUrl = `/uploads/${getDateFolder()}/${req.file.filename}`;
+    res.send(`
+        <h1>File Uploaded Successfully</h1>
+        <p>Click the link below to view your file:</p>
+        <a href="${fileUrl}" target="_blank">View File</a>
+        <br><br>
+        <a href="/">Upload Another File</a>
+    `);
+});
+
+// Route to list all uploaded files
+app.get('/files', async (req, res) => {
+    try {
+        const directories = await readdir(uploadFolder); // Read directories (date-based)
+        let fileLinks = '';
+
+        // Iterate over each directory (created based on date)
+        for (const dir of directories) {
+            const dirPath = path.join(uploadFolder, dir);
+            if (fs.lstatSync(dirPath).isDirectory()) {
+                const files = await readdir(dirPath); // Read files in the date-based folder
+                for (const file of files) {
+                    const fileUrl = `/uploads/${dir}/${file}`;
+                    fileLinks += `<li><a href="${fileUrl}" target="_blank">${file}</a></li>`;
+                }
+            }
+        }
+
+        res.send(`
+            <h1>All Uploaded Files</h1>
+            <ul>
+                ${fileLinks}
+            </ul>
+            <br><br>
+            <a href="/">Upload Another File</a>
+        `);
+    } catch (err) {
+        res.send('Error listing files');
+    }
+});
+
+// Start the server
+app.listen(port, () => {
+    console.log(`Server is running at http://localhost:${port}`);
+});
