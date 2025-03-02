@@ -2,6 +2,8 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const util = require('util');
+const readdir = util.promisify(fs.readdir);
 
 const app = express();
 const port = 3000;
@@ -47,34 +49,4 @@ const upload = multer({ storage: storage });
 app.use('/uploads', express.static(uploadFolder));
 
 // Home route to upload a file
-app.get('/', (req, res) => {
-    res.send(`
-        <h1>Upload a File</h1>
-        <form action="/upload" method="POST" enctype="multipart/form-data">
-            <input type="file" name="file" required />
-            <button type="submit">Upload</button>
-        </form>
-    `);
-});
-
-// File upload route
-app.post('/upload', upload.single('file'), (req, res) => {
-    if (!req.file) {
-        return res.send('Please upload a file.');
-    }
-
-    // Get the relative file path
-    const fileUrl = `/uploads/${getDateFolder()}/${req.file.filename}`;
-    res.send(`
-        <h1>File Uploaded Successfully</h1>
-        <p>Click the link below to view your file:</p>
-        <a href="${fileUrl}" target="_blank">View File</a>
-        <br><br>
-        <a href="/">Upload Another File</a>
-    `);
-});
-
-// Start the server
-app.listen(port, () => {
-    console.log(`File hosting server running at http://localhost:${port}`);
-});
+app.get('/', (req, res
