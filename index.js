@@ -7,7 +7,7 @@ const app = express();
 const port = 3000;
 
 // The passcode for the admin (plain text)
-const ADMIN_PASSCODE = 'your-strong-passcode'; // Replace with your desired passcode
+const ADMIN_PASSCODE = 'your-strong-passcode';  // Change this to your own passcode
 
 // Create an 'uploads' directory if it doesn't exist
 const uploadDir = path.join(__dirname, 'uploads');
@@ -18,22 +18,25 @@ if (!fs.existsSync(uploadDir)) {
 // Set up Multer for file storage
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, uploadDir);
+        cb(null, uploadDir);  // Save files in the 'uploads' folder
     },
     filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname));
+        cb(null, Date.now() + path.extname(file.originalname));  // Rename files to avoid conflicts
     }
 });
 
 const upload = multer({ storage: storage });
 
-// Serve static files (like index.html) from the 'public' folder
+// Serve static files (like the HTML upload form) from the 'public' folder
 app.use(express.static('public'));
 
 // Parse incoming form data (to handle the admin login form)
 app.use(express.urlencoded({ extended: true }));
 
-// Handle file upload
+// Serve the uploaded files as static files
+app.use('/uploads', express.static(uploadDir));
+
+// Handle file upload by users
 app.post('/upload', upload.single('file'), (req, res) => {
     if (!req.file) {
         return res.status(400).send('No file uploaded.');
@@ -46,9 +49,6 @@ app.post('/upload', upload.single('file'), (req, res) => {
         <a href="/">Upload another file</a>
     `);
 });
-
-// Serve the uploaded files
-app.use('/uploads', express.static(uploadDir));
 
 // Admin login page
 app.get('/admin', (req, res) => {
@@ -70,7 +70,7 @@ app.post('/admin', (req, res) => {
         res.send(`
             <h1>Admin File Directory</h1>
             <ul>
-                ${files.map(file => `<li><a href="${file.url}">${file.filename}</a></li>`).join('')}
+                ${files.map(file => `<li><a href="${file.url}" target="_blank">${file.filename}</a></li>`).join('')}
             </ul>
             <br>
             <a href="/admin">Log out</a>
